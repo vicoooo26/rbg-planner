@@ -228,6 +228,7 @@ type MetricConfig struct {
 	// itl, requestDuration, requestsTotal, isl, osl. Values: histogram_avg,
 	// counter_increase, counter_ratio.
 	// +optional
+	// +kubebuilder:validation:Enum=histogram_avg;counter_increase;counter_ratio
 	MetricShapes map[string]string `json:"metricShapes,omitempty"`
 
 	// RawTemplates provides a full PromQL template per logical metric. When a

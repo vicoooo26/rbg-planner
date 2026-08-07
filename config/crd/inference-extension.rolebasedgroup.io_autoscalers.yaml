@@ -110,6 +110,10 @@ spec:
                                   MetricShapes overrides the query shape per logical metric. Keys: ttft,
                                   itl, requestDuration, requestsTotal, isl, osl. Values: histogram_avg,
                                   counter_increase, counter_ratio.
+                                enum:
+                                - histogram_avg
+                                - counter_increase
+                                - counter_ratio
                                 type: object
                               metrics:
                                 additionalProperties:

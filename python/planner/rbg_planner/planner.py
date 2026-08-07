@@ -180,6 +180,9 @@ class Planner:
                 metric_config = json.loads(config.metric_mapping_json)
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid METRIC_MAPPING_JSON, ignoring: {e}")
+            if not isinstance(metric_config, dict):
+                logger.error("METRIC_MAPPING_JSON is not a JSON object, ignoring")
+                metric_config = None
         self.metrics_client = create_metrics_adapter(
             source=config.metric_source,
             prometheus_url=config.prometheus_endpoint,

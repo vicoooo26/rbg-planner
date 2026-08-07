@@ -3,11 +3,13 @@
 #
 # Adapted from dynamo/planner/monitoring/traffic_metrics.py for RoleBasedGroup.
 
-"""Prometheus-based metrics adapter with shared query utilities.
+"""Config-driven Prometheus metrics adapter.
 
-Concrete adapters (SGLang, vLLM, Dynamo, ...) inherit from this class
-and only need to define metric names, label mappings, and override
-methods where query patterns differ.
+A single PrometheusAdapter resolves logical metrics (TTFT, ITL, request
+count, ISL/OSL, request duration) via per-metric shape dispatch
+(histogram_avg, counter_increase, counter_ratio) or user-provided raw
+PromQL templates. Built-in engine defaults live in defaults.py and are
+merged with CRD overrides at construction time.
 """
 
 import logging

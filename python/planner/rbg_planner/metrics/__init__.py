@@ -59,6 +59,15 @@ def _validate_complete(names: MetricNames) -> None:
         raise ValueError(f"Custom engine missing required metric names: {missing}")
 
 
+_VALID_SHAPES = {"histogram_avg", "counter_increase", "counter_ratio"}
+
+
+def _validate_shapes(shapes: dict[str, str]) -> None:
+    invalid = {k: v for k, v in shapes.items() if v not in _VALID_SHAPES}
+    if invalid:
+        raise ValueError(f"Invalid shape values: {invalid}. Valid: {sorted(_VALID_SHAPES)}")
+
+
 def create_metrics_adapter(
     source: str,
     prometheus_url: str,
@@ -106,9 +115,14 @@ def create_metrics_adapter(
         for k, v in metric_config.get("metricShapes", {}).items():
             if k in _SHAPE_KEY_MAP:
                 shapes[_SHAPE_KEY_MAP[k]] = v
-        raw_templates = dict(metric_config.get("rawTemplates", {}))
+        raw_templates = {
+            _SHAPE_KEY_MAP.get(k, k): v
+            for k, v in metric_config.get("rawTemplates", {}).items()
+        }
 
     if not is_builtin:
         _validate_complete(names)
+
+    _validate_shapes(shapes)
 
     return PrometheusAdapter(prometheus_url, names, shapes, raw_templates)

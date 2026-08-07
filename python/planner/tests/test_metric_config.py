@@ -57,6 +57,19 @@ class TestMergeOverride:
         query = mock_prom.custom_query.call_args.kwargs["query"]
         assert query == 'avg(custom{model_name="Qwen"})'
 
+    def test_raw_template_camelcase_key_mapped(self, mock_prom):
+        mock_prom.custom_query.return_value = [{"value": [0, "0.5"]}]
+        cfg = {"rawTemplates": {"requestDuration": "avg(custom{labelFilter})"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        adapter.get_avg_request_duration("180s", "Qwen")
+        query = mock_prom.custom_query.call_args.kwargs["query"]
+        assert query == 'avg(custom{model_name="Qwen"})'
+
+    def test_invalid_shape_raises(self, mock_prom):
+        cfg = {"metricShapes": {"ttft": "bogus"}}
+        with pytest.raises(ValueError, match="Invalid shape values"):
+            create_metrics_adapter("vllm", "http://prom:9090", cfg)
+
 
 class TestCustomEngine:
     def test_custom_engine_complete(self, mock_prom):

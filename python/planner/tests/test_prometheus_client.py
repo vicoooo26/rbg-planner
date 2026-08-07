@@ -6,7 +6,6 @@ import pytest
 
 from rbg_planner.metrics import SUPPORTED_SOURCES, create_metrics_adapter
 from rbg_planner.metrics.base import MetricsAdapter
-from rbg_planner.metrics.defaults import BUILTIN_ENGINES
 from rbg_planner.metrics.prometheus import MetricNames, PrometheusAdapter
 
 

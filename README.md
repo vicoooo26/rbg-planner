@@ -46,16 +46,18 @@ The core planning algorithm, SLA profiling methodology, and performance interpol
 
 ### Metrics Adapter
 
-The planner uses a pluggable **Metrics Adapter** module to query Prometheus. Each inference engine exposes metrics in a different format -- the adapter normalizes them into a unified interface so the scaling logic is engine-agnostic.
+The planner uses a config-driven **Metrics Adapter** module to query Prometheus. Each inference engine exposes metrics in a different format -- the adapter normalizes them into a unified interface so the scaling logic is engine-agnostic.
 
-| Adapter | Engine | Differences |
-|---------|--------|-------------|
-| `SGLangAdapter` | SGLang | ISL/OSL from counter ratios, label `model_name` |
-| `VLLMAdapter` | vLLM | ISL/OSL from counter ratios, label `model_name` |
-| `DynamoAdapter` | NVIDIA Dynamo | ISL/OSL from histograms, label `model` |
-| `PatioAdapter` | Patio | ISL/OSL from counter ratios, label `model_name` |
+A single `PrometheusAdapter` resolves each logical metric via per-metric shape dispatch (`histogram_avg`, `counter_increase`, `counter_ratio`) or user-provided raw PromQL templates. Built-in engine defaults (metric names, label mappings, and shape overrides) are registered in `python/planner/rbg_planner/metrics/defaults.py`:
 
-Configured via `metricsEndpoint.metricSource` in the AutoScaler CR. To add a new engine, implement `MetricsAdapter` in `python/planner/rbg_planner/metrics/` and register it in `ADAPTERS`.
+| Engine | ISL/OSL shape | Model label |
+|--------|---------------|-------------|
+| SGLang | counter_ratio | `model_name` |
+| vLLM | counter_ratio | `model_name` |
+| NVIDIA Dynamo | histogram_avg | `model` |
+| Patio | counter_ratio | `model_name` |
+
+Configured via `metricsEndpoint.metricSource` in the AutoScaler CR. To add a new engine, add an entry to `BUILTIN_ENGINES` in `defaults.py`, or pass a `metricConfig` override in the CRD with all metric names defined.
 
 ### Extensible Scaling Engine
 
