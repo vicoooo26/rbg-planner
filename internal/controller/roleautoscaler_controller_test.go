@@ -566,3 +566,112 @@ func TestCleanupClusterResources_NothingToCleanUp(t *testing.T) {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
 }
+
+func TestBuildPlannerEnv_MetricMappingJSON(t *testing.T) {
+	spec := &parsedSpec{
+		prefillRoleName:    "prefill",
+		decodeRoleName:     "decode",
+		backend:            "sglang-oai",
+		modelName:          "Qwen",
+		scalingInterval:    180,
+		ttft:               200,
+		itl:                20,
+		loadPredictor:      "arima",
+		predictionWindow:   50,
+		metricsPort:        9091,
+		prometheusEndpoint: "http://prom:9090",
+		metricMappingJSON:  `{"metrics":{"ttft":"vllm:ttft_v2"}}`,
+	}
+
+	env := buildPlannerEnv("test-rbg", spec, "ns", 8, 1, 1)
+
+	var got string
+	for _, e := range env {
+		if e.Name == "METRIC_MAPPING_JSON" {
+			got = e.Value
+		}
+	}
+	if got != `{"metrics":{"ttft":"vllm:ttft_v2"}}` {
+		t.Errorf("expected METRIC_MAPPING_JSON set, got %q", got)
+	}
+}
+
+func TestBuildPlannerEnv_NoMetricMappingJSONWhenEmpty(t *testing.T) {
+	spec := &parsedSpec{
+		prefillRoleName:    "prefill",
+		decodeRoleName:     "decode",
+		backend:            "sglang-oai",
+		modelName:          "Qwen",
+		scalingInterval:    180,
+		ttft:               200,
+		itl:                20,
+		loadPredictor:      "arima",
+		predictionWindow:   50,
+		metricsPort:        9091,
+		prometheusEndpoint: "http://prom:9090",
+	}
+
+	env := buildPlannerEnv("test-rbg", spec, "ns", 8, 1, 1)
+
+	for _, e := range env {
+		if e.Name == "METRIC_MAPPING_JSON" {
+			t.Errorf("did not expect METRIC_MAPPING_JSON when empty, got %q", e.Value)
+		}
+	}
+}
+
+func TestParseRASSpec_MetricConfig(t *testing.T) {
+	ras := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"scalingInterval": 180,
+				"backend":         "sglang-oai",
+				"pattern": map[string]interface{}{
+					"PDDisaggregated": map[string]interface{}{
+						"prefill": map[string]interface{}{
+							"roleName":    "prefill",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+						"decode": map[string]interface{}{
+							"roleName":    "decode",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+					},
+				},
+				"implementation": map[string]interface{}{
+					"DynamoPlanner": map[string]interface{}{
+						"modelName": "Qwen",
+						"ttft":      200.0,
+						"itl":       20.0,
+						"metricsEndpoint": map[string]interface{}{
+							"metricSource": "vllm",
+							"port":         int64(9091),
+							"metricConfig": map[string]interface{}{
+								"metrics": map[string]interface{}{
+									"ttft": "vllm:time_to_first_token_seconds_v2",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	r := &AutoScalerReconciler{}
+	spec, err := r.parseRASSpec(ras)
+	if err != nil {
+		t.Fatalf("parseRASSpec failed: %v", err)
+	}
+	if spec.metricSource != "vllm" {
+		t.Errorf("expected metricSource vllm, got %q", spec.metricSource)
+	}
+	if spec.metricMappingJSON == "" {
+		t.Fatal("expected non-empty metricMappingJSON")
+	}
+	if !strings.Contains(spec.metricMappingJSON, "vllm:time_to_first_token_seconds_v2") {
+		t.Errorf("expected metricMappingJSON to contain the overridden ttft, got %q", spec.metricMappingJSON)
+	}
+}

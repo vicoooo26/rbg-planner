@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -238,6 +239,7 @@ type parsedSpec struct {
 	profilingImage      string
 	metricSource        string
 	metricsPort         int
+	metricMappingJSON   string
 	prometheusEndpoint  string
 	modelCachePVCName   string
 	modelCacheModelPath string
@@ -307,6 +309,11 @@ func (r *AutoScalerReconciler) parseRASSpec(ras *unstructured.Unstructured) (*pa
 	me, _ := dp["metricsEndpoint"].(map[string]interface{})
 	s.metricSource = getStrField(me, "metricSource", "")
 	s.metricsPort = getIntField(me, "port", 9091)
+	if mc, ok := me["metricConfig"].(map[string]interface{}); ok && mc != nil {
+		if b, err := json.Marshal(mc); err == nil {
+			s.metricMappingJSON = string(b)
+		}
+	}
 
 	// prometheusEndpoint
 	s.prometheusEndpoint = r.PrometheusEndpoint
@@ -700,6 +707,9 @@ func buildPlannerEnv(rbgName string, spec *parsedSpec, namespace string, maxGPUB
 	// planner derives it from BACKEND (e.g. "sglang-oai" -> "sglang").
 	if spec.metricSource != "" {
 		env = append(env, corev1.EnvVar{Name: "METRIC_SOURCE", Value: spec.metricSource})
+	}
+	if spec.metricMappingJSON != "" {
+		env = append(env, corev1.EnvVar{Name: "METRIC_MAPPING_JSON", Value: spec.metricMappingJSON})
 	}
 	return env
 }
