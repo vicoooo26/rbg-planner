@@ -23,6 +23,7 @@ env/
 .coverage
 cover.out
 htmlcov/
+cover.out
 
 # Go
 bin/
