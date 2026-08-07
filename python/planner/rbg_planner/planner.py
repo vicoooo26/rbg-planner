@@ -11,6 +11,7 @@ Scales RBG roles via RBGConnector based on predicted load and SLA targets.
 """
 
 import asyncio
+import json
 import logging
 import math
 import time
@@ -173,9 +174,16 @@ class Planner:
             )
 
         # Metrics adapter for querying inference metrics
+        metric_config = None
+        if config.metric_mapping_json:
+            try:
+                metric_config = json.loads(config.metric_mapping_json)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid METRIC_MAPPING_JSON, ignoring: {e}")
         self.metrics_client = create_metrics_adapter(
             source=config.metric_source,
             prometheus_url=config.prometheus_endpoint,
+            metric_config=metric_config,
         )
 
         # Load predictors

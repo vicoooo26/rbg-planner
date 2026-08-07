@@ -28,8 +28,13 @@ def parse_args() -> argparse.Namespace:
         "--metric-source",
         type=str,
         default=None,
-        choices=["sglang", "vllm", "patio"],
-        help="Metric source (sglang, vllm, patio)",
+        help="Metric source (sglang, vllm, dynamo, patio, or a custom engine name)",
+    )
+    parser.add_argument(
+        "--metric-mapping-json",
+        type=str,
+        default=None,
+        help="JSON metricConfig overriding metric names/shapes/templates",
     )
     parser.add_argument("--model-name", type=str, default=None, help="Model name for metric filtering")
 
@@ -64,13 +69,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_config(args: argparse.Namespace) -> PlannerConfig:  # noqa: C901
-    """Build PlannerConfig from CLI args (override) + env vars (default).
-
-    Complexity is high because each config field is individually overridden from
-    CLI args when provided. This explicit one-field-at-a-time pattern is clearer
-    than a generic getattr/setattr loop and is intentionally kept readable.
-    """
+def build_config(args: argparse.Namespace) -> PlannerConfig:
+    """Build PlannerConfig from CLI args (override) + env vars (default)."""
     config = PlannerConfig()
 
     # CLI args override env vars
@@ -86,6 +86,8 @@ def build_config(args: argparse.Namespace) -> PlannerConfig:  # noqa: C901
         config.prometheus_endpoint = args.prometheus_endpoint
     if args.metric_source is not None:
         config.metric_source = args.metric_source
+    if args.metric_mapping_json is not None:
+        config.metric_mapping_json = args.metric_mapping_json
     if args.model_name is not None:
         config.model_name = args.model_name
     if args.adjustment_interval is not None:

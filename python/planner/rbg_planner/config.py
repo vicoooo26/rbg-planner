@@ -24,6 +24,7 @@ class PlannerConfig:
     )
     backend: str = os.environ.get("BACKEND", "sglang-oai")
     metric_source: str = os.environ.get("METRIC_SOURCE", "")  # sglang | vllm | patio | dynamo
+    metric_mapping_json: str = os.environ.get("METRIC_MAPPING_JSON", "")
     model_name: str = os.environ.get("MODEL_NAME", "")
 
     # Planner parameters
@@ -53,6 +54,7 @@ class PlannerConfig:
         # Re-read from environment so tests using patch.dict(os.environ) work.
         self.backend = os.environ.get("BACKEND", "sglang-oai")
         self.metric_source = os.environ.get("METRIC_SOURCE", "")
+        self.metric_mapping_json = os.environ.get("METRIC_MAPPING_JSON", "")
         # Derive metric_source from backend if not explicitly set.
         if not self.metric_source:
             self.metric_source = self.backend.split("-", 1)[0]
