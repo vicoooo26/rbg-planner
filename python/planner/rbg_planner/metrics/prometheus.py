@@ -34,6 +34,18 @@ class MetricNames:
     model_label: str = "model_name"
 
 
+# Default query shape per logical metric. The dispatch helpers fall back
+# to these when a metric has no explicit shape override.
+DEFAULT_SHAPES: dict[str, str] = {
+    "ttft": "histogram_avg",
+    "itl": "histogram_avg",
+    "request_duration": "histogram_avg",
+    "requests_total": "counter_increase",
+    "isl": "counter_ratio",
+    "osl": "counter_ratio",
+}
+
+
 class PrometheusAdapter(MetricsAdapter):
     """Base Prometheus adapter with shared PromQL query helpers.
 
