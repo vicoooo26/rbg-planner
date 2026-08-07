@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Tests for metric_config merge logic and custom-engine validation."""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from rbg_planner.metrics import create_metrics_adapter
+
+
+@pytest.fixture
+def mock_prom():
+    with patch("rbg_planner.metrics.prometheus.PrometheusConnect") as mock_cls:
+        mock_conn = MagicMock()
+        mock_cls.return_value = mock_conn
+        yield mock_conn
+
+
+class TestMergeOverride:
+    def test_override_single_metric_name(self, mock_prom):
+        cfg = {"metrics": {"ttft": "vllm:time_to_first_token_seconds_v2"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.metrics.ttft == "vllm:time_to_first_token_seconds_v2"
+        # Unspecified names fall back to the built-in default.
+        assert adapter.metrics.itl == "vllm:time_per_output_token_seconds"
+
+    def test_override_model_label(self, mock_prom):
+        cfg = {"modelLabel": "model"}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.metrics.model_label == "model"
+
+    def test_override_shape(self, mock_prom):
+        cfg = {"metricShapes": {"isl": "histogram_avg"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.shapes["isl"] == "histogram_avg"
+        # osl unchanged (default counter_ratio, not in shapes map).
+        assert "osl" not in adapter.shapes
+
+    def test_raw_templates_added(self, mock_prom):
+        cfg = {"rawTemplates": {"ttft": "avg(custom{labelFilter})"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.raw_templates["ttft"] == "avg(custom{labelFilter})"
+
+    def test_dynamo_shape_override_still_mergeable(self, mock_prom):
+        # User can override dynamo's histogram ISL back to counter_ratio.
+        cfg = {"metricShapes": {"isl": "counter_ratio"}}
+        adapter = create_metrics_adapter("dynamo", "http://prom:9090", cfg)
+        assert adapter.shapes["isl"] == "counter_ratio"
+
+    def test_merged_raw_dispatch_uses_override(self, mock_prom):
+        mock_prom.custom_query.return_value = [{"value": [0, "0.5"]}]
+        cfg = {"rawTemplates": {"ttft": "avg(custom{labelFilter})"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        adapter.get_avg_ttft("180s", "Qwen")
+        query = mock_prom.custom_query.call_args.kwargs["query"]
+        assert query == 'avg(custom{model_name="Qwen"})'
+
+
+class TestCustomEngine:
+    def test_custom_engine_complete(self, mock_prom):
+        cfg = {
+            "metrics": {
+                "ttft": "acme_ttft", "itl": "acme_itl",
+                "requestDuration": "acme_dur", "requestsTotal": "acme_reqs",
+                "promptTokens": "acme_prompt", "generationTokens": "acme_gen",
+            },
+        }
+        adapter = create_metrics_adapter("acme-llm", "http://prom:9090", cfg)
+        assert adapter.metrics.ttft == "acme_ttft"
+        assert adapter.metrics.model_label == "model_name"  # default retained
+
+    def test_custom_engine_missing_names_raises(self, mock_prom):
+        cfg = {"metrics": {"ttft": "acme_ttft"}}  # missing the rest
+        with pytest.raises(ValueError, match="missing required metric names"):
+            create_metrics_adapter("acme-llm", "http://prom:9090", cfg)
+
+    def test_custom_engine_no_config_raises(self, mock_prom):
+        with pytest.raises(ValueError, match="Unsupported metric source"):
+            create_metrics_adapter("acme-llm", "http://prom:9090")
