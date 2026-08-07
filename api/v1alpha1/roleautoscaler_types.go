@@ -190,10 +190,11 @@ type ModelCacheSpec struct {
 
 // MetricsEndpointConfig configures metrics collection.
 type MetricsEndpointConfig struct {
-	// MetricSource selects the metric source type.
+	// MetricSource selects the metric source type. Built-in: sglang, vllm,
+	// dynamo, patio. Any other value is a custom engine whose metricConfig
+	// must define all metric names.
 	// +optional
 	// +kubebuilder:default="sglang"
-	// +kubebuilder:validation:Enum=sglang;vllm;patio
 	MetricSource string `json:"metricSource,omitempty"`
 
 	// Port is the port for planner's own Prometheus metrics exposition.
@@ -202,6 +203,38 @@ type MetricsEndpointConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	Port *int32 `json:"port,omitempty"`
+
+	// MetricConfig optionally overrides metric names, query shapes, and raw
+	// PromQL templates for the selected MetricSource. Omitted means use the
+	// built-in defaults for MetricSource.
+	// +optional
+	MetricConfig *MetricConfig `json:"metricConfig,omitempty"`
+}
+
+// MetricConfig overrides the metric mapping for a single engine.
+type MetricConfig struct {
+	// ModelLabel is the Prometheus label used to filter by model name.
+	// Defaults to "model_name" (dynamo built-in uses "model").
+	// +optional
+	ModelLabel string `json:"modelLabel,omitempty"`
+
+	// Metrics overrides metric names. Keys: ttft, itl, requestDuration,
+	// requestsTotal, promptTokens, generationTokens. Subset allowed; merges
+	// over built-in defaults.
+	// +optional
+	Metrics map[string]string `json:"metrics,omitempty"`
+
+	// MetricShapes overrides the query shape per logical metric. Keys: ttft,
+	// itl, requestDuration, requestsTotal, isl, osl. Values: histogram_avg,
+	// counter_increase, counter_ratio.
+	// +optional
+	MetricShapes map[string]string `json:"metricShapes,omitempty"`
+
+	// RawTemplates provides a full PromQL template per logical metric. When a
+	// metric has an entry here, it overrides the shape dispatch entirely.
+	// Templates may use {interval} and {labelFilter} placeholders.
+	// +optional
+	RawTemplates map[string]string `json:"rawTemplates,omitempty"`
 }
 
 // AutoScalerPhase represents the current phase of an AutoScaler.

@@ -97,13 +97,48 @@ spec:
                         description: MetricsEndpoint configures the metrics collection
                           endpoint.
                         properties:
+                          metricConfig:
+                            description: |-
+                              MetricConfig optionally overrides metric names, query shapes, and raw
+                              PromQL templates for the selected MetricSource. Omitted means use the
+                              built-in defaults for MetricSource.
+                            properties:
+                              metricShapes:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  MetricShapes overrides the query shape per logical metric. Keys: ttft,
+                                  itl, requestDuration, requestsTotal, isl, osl. Values: histogram_avg,
+                                  counter_increase, counter_ratio.
+                                type: object
+                              metrics:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  Metrics overrides metric names. Keys: ttft, itl, requestDuration,
+                                  requestsTotal, promptTokens, generationTokens. Subset allowed; merges
+                                  over built-in defaults.
+                                type: object
+                              modelLabel:
+                                description: |-
+                                  ModelLabel is the Prometheus label used to filter by model name.
+                                  Defaults to "model_name" (dynamo built-in uses "model").
+                                type: string
+                              rawTemplates:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  RawTemplates provides a full PromQL template per logical metric. When a
+                                  metric has an entry here, it overrides the shape dispatch entirely.
+                                  Templates may use {interval} and {labelFilter} placeholders.
+                                type: object
+                            type: object
                           metricSource:
                             default: sglang
-                            description: MetricSource selects the metric source type.
-                            enum:
-                            - sglang
-                            - vllm
-                            - patio
+                            description: |-
+                              MetricSource selects the metric source type. Built-in: sglang, vllm,
+                              dynamo, patio. Any other value is a custom engine whose metricConfig
+                              must define all metric names.
                             type: string
                           port:
                             default: 9091
