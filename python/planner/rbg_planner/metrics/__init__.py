@@ -3,8 +3,8 @@
 
 """Pluggable metrics adapter module.
 
-Provides a unified MetricsAdapter interface with concrete adapters for
-each supported inference engine (SGLang, vLLM, Dynamo, Patio).
+Provides a config-driven PrometheusAdapter built from built-in engine
+defaults, optionally overridden by a metricConfig from the CRD.
 
 Usage::
 
@@ -15,17 +15,10 @@ Usage::
 """
 
 from rbg_planner.metrics.base import MetricsAdapter
-from rbg_planner.metrics.dynamo import DynamoAdapter
-from rbg_planner.metrics.patio import PatioAdapter
-from rbg_planner.metrics.sglang import SGLangAdapter
-from rbg_planner.metrics.vllm import VLLMAdapter
+from rbg_planner.metrics.defaults import BUILTIN_ENGINES
+from rbg_planner.metrics.prometheus import PrometheusAdapter
 
-ADAPTERS: dict[str, type[MetricsAdapter]] = {
-    "sglang": SGLangAdapter,
-    "vllm": VLLMAdapter,
-    "dynamo": DynamoAdapter,
-    "patio": PatioAdapter,
-}
+SUPPORTED_SOURCES = list(BUILTIN_ENGINES.keys())
 
 
 def create_metrics_adapter(source: str, prometheus_url: str) -> MetricsAdapter:
@@ -36,9 +29,14 @@ def create_metrics_adapter(source: str, prometheus_url: str) -> MetricsAdapter:
         prometheus_url: Prometheus server URL.
 
     Raises:
-        ValueError: If the source is not supported.
+        ValueError: If the source is not a built-in engine.
     """
-    adapter_cls = ADAPTERS.get(source)
-    if adapter_cls is None:
-        raise ValueError(f"Unsupported metric source: {source}. Supported: {list(ADAPTERS.keys())}")
-    return adapter_cls(url=prometheus_url)
+    if source not in BUILTIN_ENGINES:
+        raise ValueError(f"Unsupported metric source: {source}. Supported: {SUPPORTED_SOURCES}")
+    default = BUILTIN_ENGINES[source]
+    return PrometheusAdapter(
+        prometheus_url,
+        default["names"],
+        dict(default["shapes"]),
+        {},
+    )

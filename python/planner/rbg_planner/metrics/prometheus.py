@@ -11,7 +11,7 @@ methods where query patterns differ.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from prometheus_api_client import PrometheusConnect
@@ -47,17 +47,19 @@ DEFAULT_SHAPES: dict[str, str] = {
 
 
 class PrometheusAdapter(MetricsAdapter):
-    """Base Prometheus adapter with shared PromQL query helpers.
+    """Config-driven Prometheus adapter.
 
-    Subclasses set `self.metrics` with engine-specific metric names
-    and override methods where the query pattern differs (e.g. histogram
-    vs counter ratio for ISL/OSL).
+    Built from a MetricNames set, a per-metric shape map, and an optional
+    raw-PromQL template map. Each get_* method resolves its logical metric:
+    a raw template (if present) wins; otherwise the resolved shape selects
+    one of the _query_* helpers.
     """
 
-    metrics: MetricNames
-
-    def __init__(self, url: str):
+    def __init__(self, url, names, shapes=None, raw_templates=None):
         self.prom = PrometheusConnect(url=url, disable_ssl=True)
+        self.metrics = names
+        self.shapes = shapes or {}
+        self.raw_templates = raw_templates or {}
 
     # ── shared query helpers ─────────────────────────────────────────
 
@@ -121,6 +123,21 @@ class PrometheusAdapter(MetricsAdapter):
         query = f"increase({numerator}{lf}[{interval}])/increase({denominator}{lf}[{interval}])"
         return self._exec_avg(query, numerator)
 
+    def _query_raw(
+        self,
+        template: str,
+        interval: str,
+        model_name: Optional[str] = None,
+    ) -> float:
+        """Execute a user-provided PromQL template.
+
+        Substitutes {interval} with the window and {labelFilter} with the
+        full label selector (or empty string).
+        """
+        lf = self._build_label_filter(model_name)
+        query = template.replace("{interval}", interval).replace("{labelFilter}", lf)
+        return self._exec_avg(query, "raw")
+
     def _exec_avg(self, query: str, label: str) -> float:
         """Execute a PromQL query and return the average of all series."""
         try:
@@ -136,34 +153,83 @@ class PrometheusAdapter(MetricsAdapter):
             logger.error(f"Error querying {label}: {e}")
             return 0.0
 
-    # ── default implementations (histogram-based latency, counter-based tokens) ──
+    # ── dispatch ─────────────────────────────────────────────────────
+
+    def _dispatch_simple(
+        self,
+        logical: str,
+        name: str,
+        interval: str,
+        model_name: Optional[str],
+    ) -> float:
+        """Dispatch for metrics using histogram_avg or counter_increase."""
+        if logical in self.raw_templates:
+            return self._query_raw(self.raw_templates[logical], interval, model_name)
+        shape = self.shapes.get(logical, DEFAULT_SHAPES[logical])
+        if shape == "histogram_avg":
+            return self._query_avg_metric(name, interval, model_name)
+        if shape == "counter_increase":
+            return self._query_increase(name, interval, model_name)
+        raise ValueError(f"Unsupported shape {shape!r} for {logical!r}")
+
+    def _dispatch_ratio(
+        self,
+        logical: str,
+        token_name: str,
+        interval: str,
+        model_name: Optional[str],
+    ) -> float:
+        """Dispatch for isl/osl using counter_ratio or histogram_avg."""
+        if logical in self.raw_templates:
+            return self._query_raw(self.raw_templates[logical], interval, model_name)
+        shape = self.shapes.get(logical, DEFAULT_SHAPES[logical])
+        if shape == "counter_ratio":
+            return self._query_counter_ratio(
+                token_name,
+                self.metrics.requests_total,
+                interval,
+                model_name,
+            )
+        if shape == "histogram_avg":
+            return self._query_avg_metric(token_name, interval, model_name)
+        raise ValueError(f"Unsupported shape {shape!r} for {logical!r}")
+
+    # ── MetricsAdapter interface ─────────────────────────────────────
 
     def get_avg_ttft(self, interval: str, model_name: Optional[str] = None) -> float:
-        return self._query_avg_metric(self.metrics.ttft, interval, model_name)
+        return self._dispatch_simple("ttft", self.metrics.ttft, interval, model_name)
 
     def get_avg_itl(self, interval: str, model_name: Optional[str] = None) -> float:
-        return self._query_avg_metric(self.metrics.itl, interval, model_name)
+        return self._dispatch_simple("itl", self.metrics.itl, interval, model_name)
 
     def get_avg_request_duration(self, interval: str, model_name: Optional[str] = None) -> float:
-        return self._query_avg_metric(self.metrics.request_duration, interval, model_name)
+        return self._dispatch_simple(
+            "request_duration",
+            self.metrics.request_duration,
+            interval,
+            model_name,
+        )
 
     def get_request_count(self, interval: str, model_name: Optional[str] = None) -> float:
-        return self._query_increase(self.metrics.requests_total, interval, model_name)
-
-    def get_avg_isl(self, interval: str, model_name: Optional[str] = None) -> float:
-        """Default: counter ratio prompt_tokens / requests_total."""
-        return self._query_counter_ratio(
-            self.metrics.prompt_tokens,
+        return self._dispatch_simple(
+            "requests_total",
             self.metrics.requests_total,
             interval,
             model_name,
         )
 
+    def get_avg_isl(self, interval: str, model_name: Optional[str] = None) -> float:
+        return self._dispatch_ratio(
+            "isl",
+            self.metrics.prompt_tokens,
+            interval,
+            model_name,
+        )
+
     def get_avg_osl(self, interval: str, model_name: Optional[str] = None) -> float:
-        """Default: counter ratio generation_tokens / requests_total."""
-        return self._query_counter_ratio(
+        return self._dispatch_ratio(
+            "osl",
             self.metrics.generation_tokens,
-            self.metrics.requests_total,
             interval,
             model_name,
         )
