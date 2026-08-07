@@ -55,3 +55,11 @@ spec:
       metricsEndpoint:
         metricSource: sglang
         port: 9091
+        # metricConfig optionally overrides metric names, query shapes, and
+        # raw PromQL templates for the selected metricSource. Omitted fields
+        # fall back to built-in defaults.
+        metricConfig:
+          metrics:
+            ttft: "sglang_time_to_first_token_seconds"   # override a single name
+          metricShapes:
+            isl: counter_ratio                            # explicit shape (default)
