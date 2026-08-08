@@ -123,3 +123,9 @@ class TestEdgeCases:
         msg = str(exc_info.value)
         for field in ["itl", "request_duration", "requests_total", "prompt_tokens", "generation_tokens"]:
             assert field in msg, f"expected {field!r} in error message, got: {msg}"
+
+    def test_raw_template_unknown_key_passthrough(self, mock_prom):
+        cfg = {"rawTemplates": {"myCustomMetric": "avg(custom{labelFilter})"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert "myCustomMetric" in adapter.raw_templates
+        assert adapter.raw_templates["myCustomMetric"] == "avg(custom{labelFilter})"

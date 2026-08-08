@@ -9,6 +9,7 @@ PlannerConfig, factory merge, adapter dispatch — to produce correct PromQL que
 """
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -26,11 +27,6 @@ def golden_json():
 
 
 @pytest.fixture
-def golden_config(golden_json):
-    return json.loads(golden_json)
-
-
-@pytest.fixture
 def mock_prom():
     with patch("rbg_planner.metrics.prometheus.PrometheusConnect") as mock_cls:
         mock_conn = MagicMock()
@@ -39,11 +35,11 @@ def mock_prom():
 
 
 class TestGoldenJSONIntegration:
-    def test_golden_json_full_stack(self, mock_prom, golden_json, golden_config):
+    def test_golden_json_full_stack(self, mock_prom, golden_json):
         """The golden JSON from the Go controller flows through the full
         Python stack: env var → PlannerConfig → factory → adapter → PromQL."""
         # 1. Env var → PlannerConfig
-        with patch.dict("os.environ", {"METRIC_MAPPING_JSON": golden_json}):
+        with patch.dict(os.environ, {"METRIC_MAPPING_JSON": golden_json}):
             config = PlannerConfig()
         assert config.metric_mapping_json == golden_json
 
@@ -88,8 +84,8 @@ class TestGoldenJSONIntegration:
     def test_backward_compat_no_metric_config(self, mock_prom):
         """Empty metric_mapping_json → adapter uses built-in sglang defaults
         → correct PromQL query."""
-        with patch.dict("os.environ", {}, clear=False):
-            import os
+        with patch.dict(os.environ, {"BACKEND": "sglang-oai", "METRIC_SOURCE": ""}, clear=False):
+            os.environ.pop("METRIC_SOURCE", None)
             os.environ.pop("METRIC_MAPPING_JSON", None)
             config = PlannerConfig()
 
