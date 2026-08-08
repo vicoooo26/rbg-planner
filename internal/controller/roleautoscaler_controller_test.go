@@ -18,6 +18,9 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -673,5 +676,126 @@ func TestParseRASSpec_MetricConfig(t *testing.T) {
 	}
 	if !strings.Contains(spec.metricMappingJSON, "vllm:time_to_first_token_seconds_v2") {
 		t.Errorf("expected metricMappingJSON to contain the overridden ttft, got %q", spec.metricMappingJSON)
+	}
+}
+
+func TestParseRASSpec_NoMetricConfig_BackwardCompat(t *testing.T) {
+	ras := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"scalingInterval": 180,
+				"backend":         "sglang-oai",
+				"pattern": map[string]interface{}{
+					"PDDisaggregated": map[string]interface{}{
+						"prefill": map[string]interface{}{
+							"roleName":    "prefill",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+						"decode": map[string]interface{}{
+							"roleName":    "decode",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+					},
+				},
+				"implementation": map[string]interface{}{
+					"DynamoPlanner": map[string]interface{}{
+						"modelName": "Qwen",
+						"ttft":      200.0,
+						"itl":       20.0,
+						"metricsEndpoint": map[string]interface{}{
+							"metricSource": "sglang",
+							"port":         int64(9091),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	r := &AutoScalerReconciler{}
+	spec, err := r.parseRASSpec(ras)
+	if err != nil {
+		t.Fatalf("parseRASSpec failed: %v", err)
+	}
+	if spec.metricSource != "sglang" {
+		t.Errorf("expected metricSource sglang, got %q", spec.metricSource)
+	}
+	if spec.metricMappingJSON != "" {
+		t.Errorf("expected empty metricMappingJSON, got %q", spec.metricMappingJSON)
+	}
+}
+
+func TestParseRASSpec_MetricConfig_GoldenFixture(t *testing.T) {
+	goldenPath := "../../python/planner/tests/fixtures/metric_config_golden.json"
+	expected, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("failed to read golden fixture: %v", err)
+	}
+
+	ras := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"scalingInterval": 180,
+				"backend":         "sglang-oai",
+				"pattern": map[string]interface{}{
+					"PDDisaggregated": map[string]interface{}{
+						"prefill": map[string]interface{}{
+							"roleName":    "prefill",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+						"decode": map[string]interface{}{
+							"roleName":    "decode",
+							"maxReplicas": int64(10),
+							"minReplicas": int64(1),
+						},
+					},
+				},
+				"implementation": map[string]interface{}{
+					"DynamoPlanner": map[string]interface{}{
+						"modelName": "Qwen",
+						"ttft":      200.0,
+						"itl":       20.0,
+						"metricsEndpoint": map[string]interface{}{
+							"metricSource": "sglang",
+							"port":         int64(9091),
+							"metricConfig": map[string]interface{}{
+								"modelLabel": "model",
+								"metrics": map[string]interface{}{
+									"ttft":            "custom_ttft_seconds",
+									"requestDuration": "custom_duration_seconds",
+								},
+								"metricShapes": map[string]interface{}{
+									"isl":             "histogram_avg",
+									"requestDuration": "counter_increase",
+								},
+								"rawTemplates": map[string]interface{}{
+									"osl": "avg(custom_gen_tokens{labelFilter}) / avg(custom_requests{labelFilter})",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	r := &AutoScalerReconciler{}
+	spec, err := r.parseRASSpec(ras)
+	if err != nil {
+		t.Fatalf("parseRASSpec failed: %v", err)
+	}
+
+	var got, want map[string]interface{}
+	if err := json.Unmarshal([]byte(spec.metricMappingJSON), &got); err != nil {
+		t.Fatalf("failed to unmarshal metricMappingJSON: %v", err)
+	}
+	if err := json.Unmarshal(expected, &want); err != nil {
+		t.Fatalf("failed to unmarshal golden fixture: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("metricMappingJSON does not match golden fixture\n got: %s\n want: %s", spec.metricMappingJSON, string(expected))
 	}
 }

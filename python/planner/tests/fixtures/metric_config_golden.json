@@ -1,0 +1,14 @@
+{
+  "modelLabel": "model",
+  "metrics": {
+    "ttft": "custom_ttft_seconds",
+    "requestDuration": "custom_duration_seconds"
+  },
+  "metricShapes": {
+    "isl": "histogram_avg",
+    "requestDuration": "counter_increase"
+  },
+  "rawTemplates": {
+    "osl": "avg(custom_gen_tokens{labelFilter}) / avg(custom_requests{labelFilter})"
+  }
+}
