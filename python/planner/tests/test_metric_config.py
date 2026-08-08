@@ -92,3 +92,34 @@ class TestCustomEngine:
     def test_custom_engine_no_config_raises(self, mock_prom):
         with pytest.raises(ValueError, match="Unsupported metric source"):
             create_metrics_adapter("acme-llm", "http://prom:9090")
+
+
+class TestEdgeCases:
+    def test_empty_dict_metric_config_on_custom_engine(self, mock_prom):
+        with pytest.raises(ValueError, match="Unsupported metric source"):
+            create_metrics_adapter("acme-llm", "http://prom:9090", {})
+
+    def test_unknown_metric_keys_dropped(self, mock_prom):
+        cfg = {"metrics": {"ttft": "ok", "bogus": "ignored"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.metrics.ttft == "ok"
+        assert not hasattr(adapter.metrics, "bogus")
+
+    def test_unknown_shape_keys_dropped(self, mock_prom):
+        cfg = {"metricShapes": {"isl": "histogram_avg", "bogus": "ignored"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert "isl" in adapter.shapes
+        assert "bogus" not in adapter.shapes
+
+    def test_metric_shapes_camelcase_key_mapped(self, mock_prom):
+        cfg = {"metricShapes": {"requestDuration": "counter_increase"}}
+        adapter = create_metrics_adapter("vllm", "http://prom:9090", cfg)
+        assert adapter.shapes["request_duration"] == "counter_increase"
+
+    def test_custom_engine_missing_fields_lists_exact_fields(self, mock_prom):
+        cfg = {"metrics": {"ttft": "acme_ttft"}}
+        with pytest.raises(ValueError) as exc_info:
+            create_metrics_adapter("acme-llm", "http://prom:9090", cfg)
+        msg = str(exc_info.value)
+        for field in ["itl", "request_duration", "requests_total", "prompt_tokens", "generation_tokens"]:
+            assert field in msg, f"expected {field!r} in error message, got: {msg}"
