@@ -58,6 +58,21 @@ class TestLabelFilter:
         adapter = create_metrics_adapter("dynamo", "http://prom:9090")
         assert adapter._build_label_filter(model_name="Qwen/Qwen3-0.6B") == '{model="Qwen/Qwen3-0.6B"}'
 
+    def test_role_filter(self, mock_prom):
+        adapter = create_metrics_adapter("sglang", "http://prom:9090")
+        lf = adapter._build_label_filter(model_name="Qwen", role="prefill")
+        assert lf == '{model_name="Qwen",role="prefill"}'
+
+    def test_role_filter_query(self, mock_prom):
+        mock_prom.custom_query.return_value = []
+        adapter = create_metrics_adapter("sglang", "http://prom:9090")
+        adapter._query_avg_metric("sglang_time_to_first_token_seconds", "180s", "Qwen", "prefill")
+        query = mock_prom.custom_query.call_args.kwargs["query"]
+        assert query == (
+            'increase(sglang_time_to_first_token_seconds_sum{model_name="Qwen",role="prefill"}[180s])'
+            '/increase(sglang_time_to_first_token_seconds_count{model_name="Qwen",role="prefill"}[180s])'
+        )
+
 
 class TestQueryMetrics:
     def test_avg_ttft_with_data(self, mock_prom):

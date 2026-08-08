@@ -33,3 +33,16 @@ def test_backend_env_var_stored():
     with patch.dict(os.environ, {"BACKEND": "sglang-oai"}):
         config = PlannerConfig()
         assert config.backend == "sglang-oai"
+
+
+def test_metric_mapping_json_from_env():
+    with patch.dict(os.environ, {"METRIC_MAPPING_JSON": '{"metrics":{"ttft":"custom"}}'}):
+        config = PlannerConfig()
+        assert config.metric_mapping_json == '{"metrics":{"ttft":"custom"}}'
+
+
+def test_metric_mapping_json_default_empty():
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("METRIC_MAPPING_JSON", None)
+        config = PlannerConfig()
+        assert config.metric_mapping_json == ""
