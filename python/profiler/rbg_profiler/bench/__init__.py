@@ -22,7 +22,13 @@ For pluggable execution methods (HTTP, inference-perf), use the factory::
 """
 
 from rbg_profiler.bench.base import BaseBenchBackend, BenchBackend
-from rbg_profiler.bench.executor import BenchExecutor, BenchParams, BenchResult
+from rbg_profiler.bench.cli_executor import CLIBenchExecutor
+from rbg_profiler.bench.executor import (
+    BenchExecutionError,
+    BenchExecutor,
+    BenchParams,
+    BenchResult,
+)
 from rbg_profiler.bench.factory import create_bench_executor
 from rbg_profiler.bench.http_executor import HTTPBenchExecutor
 from rbg_profiler.bench.inference_perf_executor import InferencePerfExecutor
