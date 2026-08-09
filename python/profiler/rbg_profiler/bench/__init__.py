@@ -12,9 +12,21 @@ Usage::
 
     backend = create_bench_backend("sglang-oai")
     metrics = await backend.run_benchmark(endpoint, model, 5, 1024, 5)
+
+For pluggable execution methods (HTTP, inference-perf), use the factory::
+
+    from rbg_profiler.bench import create_bench_executor
+
+    executor = create_bench_executor("http", "sglang-oai")
+    result = await executor.execute(params)
 """
 
 from rbg_profiler.bench.base import BaseBenchBackend, BenchBackend
+from rbg_profiler.bench.executor import BenchExecutor, BenchParams, BenchResult
+from rbg_profiler.bench.factory import create_bench_executor
+from rbg_profiler.bench.http_executor import HTTPBenchExecutor
+from rbg_profiler.bench.inference_perf_executor import InferencePerfExecutor
+from rbg_profiler.bench.pipeline import ProfilingPipeline
 from rbg_profiler.bench.sglang import SGLangBenchBackend, SGLangChatBenchBackend
 from rbg_profiler.bench.vllm import VLLMBenchBackend, VLLMChatBenchBackend
 
