@@ -21,7 +21,8 @@ import sys
 from kubernetes import client, config
 from kubernetes.config.config_exception import ConfigException
 
-from rbg_profiler.bench import create_bench_backend
+from rbg_profiler.bench import create_bench_executor
+from rbg_profiler.bench.pipeline import ProfilingPipeline
 from rbg_profiler.rbg_discoverer import RoleEndpoint
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ async def run_profiling(args, prefill_endpoint: RoleEndpoint, decode_endpoint: R
     logger.info("  DECODE_BASE_URL: %s", decode_endpoint.base_url)
     logger.info("  MODEL: %s", args.model_name)
     logger.info("  BACKEND: %s", backend)
+    logger.info("  BENCH_METHOD: %s", getattr(args, 'bench_method', 'http'))
     logger.info("  PREFILL_GPUS: %d", prefill_endpoint.num_gpus)
     logger.info("  DECODE_GPUS: %d", decode_endpoint.num_gpus)
     logger.info("  MAX_KV_TOKENS: %d", args.max_kv_tokens)
@@ -68,7 +70,9 @@ async def run_profiling(args, prefill_endpoint: RoleEndpoint, decode_endpoint: R
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    bench_backend = create_bench_backend(backend)
+    bench_method = getattr(args, 'bench_method', 'http')
+    executor = create_bench_executor(method=bench_method, backend=backend)
+    pipeline = ProfilingPipeline(executor)
 
     prefill_isl_points = [int(x) for x in args.prefill_isl_points.split(",")]
     decode_isl_points = [int(x) for x in args.decode_isl_points.split(",")]
@@ -89,7 +93,7 @@ async def run_profiling(args, prefill_endpoint: RoleEndpoint, decode_endpoint: R
     logger.info("PHASE 1: Prefill Profiling")
     logger.info("=" * 60)
 
-    prefill_results = await bench_backend.bench_prefill(
+    prefill_results = await pipeline.bench_prefill(
         endpoint=prefill_endpoint,
         model=args.model_name,
         isl_points=prefill_isl_points,
@@ -108,7 +112,7 @@ async def run_profiling(args, prefill_endpoint: RoleEndpoint, decode_endpoint: R
     logger.info("PHASE 2: Decode Profiling")
     logger.info("=" * 60)
 
-    decode_results = await bench_backend.bench_decode(
+    decode_results = await pipeline.bench_decode(
         endpoint=decode_endpoint,
         model=args.model_name,
         isl_points=decode_isl_points,
