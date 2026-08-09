@@ -82,7 +82,7 @@ async def test_prefill_skips_isl_exceeding_context(stub_endpoint, good_result):
 
     assert len(results) == 1
     assert results[0].isl == 128
-    assert len(executor.calls) == 1  # 32216 never attempted
+    assert len(executor.calls) == 1  # 32256 never attempted
 
 
 @pytest.mark.asyncio

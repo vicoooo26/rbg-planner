@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from rbg_profiler.bench.base import PrefillProfileData, DecodeProfileData
 from rbg_profiler.bench.executor import BenchResult
 from rbg_profiler.rbg_discoverer import RoleEndpoint
 
@@ -66,8 +65,8 @@ async def test_run_profiling_uses_pipeline(mock_endpoint, mock_args, mock_bench_
 
     # Executor should have been called for each sweep point
     # Prefill: 2 ISL points (128, 256)
-    # Decode: 1 ISL point (256), multiple concurrency points
-    assert mock_executor.execute.call_count >= 2
+    # Decode: 1 ISL point (256) × 3 concurrency points [1, 22, 43]
+    assert mock_executor.execute.call_count == 5
 
 
 @pytest.mark.asyncio

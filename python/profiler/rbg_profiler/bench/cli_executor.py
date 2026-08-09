@@ -12,6 +12,7 @@ error handling, and report discovery.
 import asyncio
 import logging
 import os
+import shutil
 import tempfile
 
 from abc import abstractmethod
@@ -59,6 +60,7 @@ class CLIBenchExecutor(BenchExecutor):
         """Create a unique report directory for this benchmark point."""
         dir_name = f"{self.tool_name}_isl{params.isl}_osl{params.osl}_n{params.num_prompts}"
         report_dir = os.path.join(tempfile.gettempdir(), "rbg-bench-reports", dir_name)
+        shutil.rmtree(report_dir, ignore_errors=True)
         os.makedirs(report_dir, exist_ok=True)
         return report_dir
 
@@ -74,7 +76,7 @@ class CLIBenchExecutor(BenchExecutor):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate()
+        _, stderr = await process.communicate()
 
         if process.returncode != 0:
             raise BenchExecutionError(
