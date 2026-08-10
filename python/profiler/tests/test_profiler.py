@@ -89,3 +89,31 @@ async def test_run_profiling_backward_compat_http(mock_endpoint, mock_args):
         )
 
     mock_executor.execute.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_run_profiling_defaults_bench_method(mock_endpoint, mock_bench_result):
+    """run_profiling defaults to http when args lacks bench_method attribute."""
+    from rbg_profiler.profiler import run_profiling
+
+    args = Namespace(
+        model_name="test-model",
+        max_kv_tokens=32768,
+        max_context_length=32768,
+        output_dir="/tmp/test_profiling",
+        prefill_isl_points="128,256",
+        decode_isl_points="256",
+        decode_granularity=3,
+        output_configmap="test-cm",
+        namespace="default",
+        update_configmap=False,
+        # Note: no bench_method — should default to "http" via getattr
+    )
+
+    mock_executor = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=mock_bench_result)
+
+    with patch("rbg_profiler.profiler.create_bench_executor", return_value=mock_executor) as mock_factory:
+        await run_profiling(args, mock_endpoint, mock_endpoint, backend="sglang-oai")
+
+    mock_factory.assert_called_once_with(method="http", backend="sglang-oai")

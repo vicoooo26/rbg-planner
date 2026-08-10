@@ -68,6 +68,25 @@ def test_cli_executor_is_abstract():
         CLIBenchExecutor()
 
 
+def test_make_report_dir_cleans_old_contents(stub_params):
+    """_make_report_dir removes stale files before creating a fresh directory."""
+    import os
+
+    executor = _StubCLIExecutor()
+    report_dir = executor._make_report_dir(stub_params)
+
+    # Write a stale report to simulate a previous run
+    stale_file = os.path.join(report_dir, "summary.json")
+    with open(stale_file, "w") as f:
+        json.dump({"stale": True}, f)
+    assert os.path.exists(stale_file)
+
+    # Second call should clean the directory
+    report_dir2 = executor._make_report_dir(stub_params)
+    assert report_dir == report_dir2
+    assert not os.path.exists(stale_file)
+
+
 @pytest.mark.asyncio
 async def test_execute_success(stub_params, tmp_path):
     """execute() runs subprocess, finds report, parses it."""

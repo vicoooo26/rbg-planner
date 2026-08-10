@@ -54,33 +54,35 @@ def test_build_args(stub_params):
     args = executor.build_args(stub_params, "/tmp/reports/test")
 
     assert args[0] == "inference-perf"
-    assert "--server.type" in args
-    assert "vllm" in args
-    assert "--server.base_url" in args
-    assert "http://test:8000" in args
-    assert "--server.model_name" in args
-    assert "test-model" in args
-    assert "--server.ignore_eos" in args
-    assert "true" in args
-    assert "--api.type" in args
-    assert "completion" in args
-    assert "--api.streaming" in args
-    assert "--data.type" in args
-    assert "synthetic" in args
-    assert "--data.input_distribution.mean" in args
-    assert "1024" in args
-    assert "--data.input_distribution.std_dev" in args
-    assert "0" in args
-    assert "--data.output_distribution.mean" in args
-    assert "5" in args
-    assert "--load.type" in args
-    assert "concurrent" in args
-    assert "--storage.local_storage.path" in args
-    assert "/tmp/reports/test" in args
+
+    def _val(flag):
+        idx = args.index(flag)
+        return args[idx + 1]
+
+    assert _val("--server.type") == "vllm"
+    assert _val("--server.base_url") == "http://test:8000"
+    assert _val("--server.model_name") == "test-model"
+    assert _val("--server.ignore_eos") == "true"
+    assert _val("--api.type") == "completion"
+    assert _val("--api.streaming") == "true"
+    assert _val("--data.type") == "synthetic"
+    assert _val("--data.input_distribution.mean") == "1024"
+    assert _val("--data.input_distribution.std_dev") == "0"
+    assert _val("--data.input_distribution.min") == "1024"
+    assert _val("--data.input_distribution.max") == "1024"
+    assert _val("--data.input_distribution.total_count") == "1"
+    assert _val("--data.output_distribution.mean") == "5"
+    assert _val("--data.output_distribution.std_dev") == "0"
+    assert _val("--data.output_distribution.min") == "5"
+    assert _val("--data.output_distribution.max") == "5"
+    assert _val("--data.output_distribution.total_count") == "1"
+    assert _val("--load.type") == "concurrent"
+    assert _val("--report.request_lifecycle.summary") == "true"
+    assert _val("--report.request_lifecycle.percentiles") == "[50, 90, 99]"
+    assert _val("--storage.local_storage.path") == "/tmp/reports/test"
 
     # Verify load.stages JSON contains correct concurrency and num_requests
-    stages_idx = args.index("--load.stages")
-    stages_json = args[stages_idx + 1]
+    stages_json = _val("--load.stages")
     stages = json.loads(stages_json)
     assert stages[0]["concurrency_level"] == 1
     assert stages[0]["num_requests"] == 1
@@ -145,3 +147,42 @@ def test_find_report_path_not_found(tmp_path):
     executor = InferencePerfExecutor(backend="vllm")
     with pytest.raises(FileNotFoundError):
         executor.find_report_path(str(tmp_path))
+
+
+def test_invalid_backend_raises():
+    """InferencePerfExecutor raises ValueError for unsupported backend."""
+    with pytest.raises(ValueError, match="Unsupported backend"):
+        InferencePerfExecutor(backend="unknown-engine")
+
+
+def test_parse_report_with_failures(tmp_path, caplog):
+    """parse_report logs warning when failures.count > 0 but still returns result."""
+    executor = InferencePerfExecutor(backend="vllm")
+    report = {
+        "successes": {
+            "count": 477,
+            "latency": {
+                "request_latency": {"mean": 3.0},
+                "time_to_first_token": {"mean": 0.5},
+                "inter_token_latency": {"mean": 0.01},
+                "time_per_output_token": {"mean": 0.02},
+            },
+            "throughput": {
+                "requests_per_sec": 1.0,
+                "output_tokens_per_sec": 600.0,
+            },
+        },
+        "failures": {"count": 3},
+        "benchmark_time_seconds": 60.0,
+    }
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(report))
+
+    import logging
+    with caplog.at_level(logging.WARNING):
+        result = executor.parse_report(str(report_path))
+
+    assert isinstance(result, BenchResult)
+    assert result.mean_ttft_ms == pytest.approx(500.0)
+    assert result.output_throughput == pytest.approx(600.0)
+    assert "3 failed requests" in caplog.text

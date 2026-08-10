@@ -203,6 +203,71 @@ async def test_decode_skips_isl_exceeding_context(stub_endpoint, good_result):
     assert all(c.isl == 128 for c in executor.calls)
 
 
+@pytest.mark.asyncio
+async def test_decode_continues_on_generic_error(stub_endpoint, good_result):
+    """bench_decode should continue sweep when a transient error occurs."""
+    executor = _StubExecutor(error=RuntimeError("transient"))
+    pipeline = ProfilingPipeline(executor)
+
+    results = await pipeline.bench_decode(
+        endpoint=stub_endpoint,
+        model="m",
+        isl_points=[256],
+        max_kv_tokens=32768,
+        osl=500,
+        concurrency_granularity=3,
+    )
+
+    # All points attempted, none produced results
+    assert len(results) == 0
+    assert len(executor.calls) >= 2  # multiple concurrency points attempted
+
+
+@pytest.mark.asyncio
+async def test_decode_small_max_concurrency_uses_range(stub_endpoint, good_result):
+    """When max_concurrency <= granularity, use range(1, max_conc+1) directly."""
+    executor = _StubExecutor(result=good_result)
+    pipeline = ProfilingPipeline(executor)
+
+    # isl=512, osl=500, max_kv_tokens=32768
+    # max_concurrency = min(32768 // 1012, 512) = min(32, 512) = 32
+    # granularity=6, 32 > 6 so goes to else branch — need smaller max_concurrency
+    # isl=32000, osl=500: max_conc = min(32768 // 32500, 512) = min(1, 512) = 1
+    # 1 <= 6, so uses range(1, 2) = [1]
+    results = await pipeline.bench_decode(
+        endpoint=stub_endpoint,
+        model="m",
+        isl_points=[32000],
+        max_kv_tokens=32768,
+        osl=500,
+        concurrency_granularity=6,
+    )
+
+    assert len(results) == 1
+    assert results[0].concurrency == 1
+
+
+@pytest.mark.asyncio
+async def test_decode_skips_when_max_concurrency_zero(stub_endpoint, good_result):
+    """bench_decode skips ISL when max_kv_tokens // (isl + osl) == 0."""
+    executor = _StubExecutor(result=good_result)
+    pipeline = ProfilingPipeline(executor)
+
+    # isl=33000, osl=500, max_kv_tokens=32768
+    # max_concurrency = min(32768 // 33500, 512) = min(0, 512) = 0 → skip
+    results = await pipeline.bench_decode(
+        endpoint=stub_endpoint,
+        model="m",
+        isl_points=[128, 33000],
+        max_kv_tokens=32768,
+        osl=500,
+    )
+
+    # Only ISL=128 produces results; 33000 skipped
+    assert all(r.isl == 128 for r in results)
+    assert all(c.isl == 128 for c in executor.calls)
+
+
 # ── bench_unified ──
 
 
