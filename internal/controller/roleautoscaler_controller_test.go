@@ -33,7 +33,7 @@ import (
 )
 
 func TestBuildProfilingVolumes_WithPVCAndRelativeModelPath(t *testing.T) {
-	volumes, mounts, tokenizer := buildProfilingVolumes("model-pvc", "deepseek-r1", "/opt/model-cache")
+	volumes, mounts, tokenizer := buildProfilingVolumes("model-pvc", "deepseek-r1", "/opt/model")
 
 	if len(volumes) != 1 {
 		t.Fatalf("expected 1 volume, got %d", len(volumes))
@@ -48,20 +48,20 @@ func TestBuildProfilingVolumes_WithPVCAndRelativeModelPath(t *testing.T) {
 	if len(mounts) != 1 {
 		t.Fatalf("expected 1 mount, got %d", len(mounts))
 	}
-	if mounts[0].MountPath != "/opt/model-cache" {
-		t.Errorf("expected mount path '/opt/model-cache', got %q", mounts[0].MountPath)
+	if mounts[0].MountPath != "/opt/model" {
+		t.Errorf("expected mount path '/opt/model', got %q", mounts[0].MountPath)
 	}
 	if !mounts[0].ReadOnly {
 		t.Error("expected ReadOnly mount")
 	}
 
-	if tokenizer != "/opt/model-cache/deepseek-r1" {
-		t.Errorf("expected tokenizer '/opt/model-cache/deepseek-r1', got %q", tokenizer)
+	if tokenizer != "/opt/model/deepseek-r1" {
+		t.Errorf("expected tokenizer '/opt/model/deepseek-r1', got %q", tokenizer)
 	}
 }
 
 func TestBuildProfilingVolumes_WithAbsoluteModelPath(t *testing.T) {
-	_, _, tokenizer := buildProfilingVolumes("model-pvc", "/abs/path/model", "/opt/model-cache")
+	_, _, tokenizer := buildProfilingVolumes("model-pvc", "/abs/path/model", "/opt/model")
 
 	if tokenizer != "/abs/path/model" {
 		t.Errorf("expected tokenizer '/abs/path/model', got %q", tokenizer)
@@ -69,7 +69,7 @@ func TestBuildProfilingVolumes_WithAbsoluteModelPath(t *testing.T) {
 }
 
 func TestBuildProfilingVolumes_WithoutPVCName(t *testing.T) {
-	volumes, mounts, tokenizer := buildProfilingVolumes("", "deepseek-r1", "/opt/model-cache")
+	volumes, mounts, tokenizer := buildProfilingVolumes("", "deepseek-r1", "/opt/model")
 
 	if len(volumes) != 0 {
 		t.Errorf("expected 0 volumes, got %d", len(volumes))
@@ -83,7 +83,7 @@ func TestBuildProfilingVolumes_WithoutPVCName(t *testing.T) {
 }
 
 func TestBuildProfilingVolumes_WithoutModelPath(t *testing.T) {
-	volumes, mounts, tokenizer := buildProfilingVolumes("model-pvc", "", "/opt/model-cache")
+	volumes, mounts, tokenizer := buildProfilingVolumes("model-pvc", "", "/opt/model")
 
 	if len(volumes) != 1 {
 		t.Fatalf("expected 1 volume (PVC still mounted), got %d", len(volumes))
@@ -99,8 +99,8 @@ func TestBuildProfilingVolumes_WithoutModelPath(t *testing.T) {
 func TestBuildProfilingVolumes_DefaultMountPath(t *testing.T) {
 	_, mounts, _ := buildProfilingVolumes("model-pvc", "model", "")
 
-	if mounts[0].MountPath != "/opt/model-cache" {
-		t.Errorf("expected default mount path '/opt/model-cache', got %q", mounts[0].MountPath)
+	if mounts[0].MountPath != "/opt/model" {
+		t.Errorf("expected default mount path '/opt/model', got %q", mounts[0].MountPath)
 	}
 }
 
