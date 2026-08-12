@@ -394,7 +394,7 @@ func TestHandleProfiling_FailedJobTriggersDelete(t *testing.T) {
 	}
 }
 
-func TestHandleProfiling_FailedJobAlreadyDeletingSkipsDelete(t *testing.T) {
+func TestHandleProfiling_FailedJobAlreadyDeleting_ReturnsNotReady(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := batchv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("failed to add batch scheme: %v", err)
@@ -425,12 +425,12 @@ func TestHandleProfiling_FailedJobAlreadyDeletingSkipsDelete(t *testing.T) {
 
 	r := &AutoScalerReconciler{Client: cl, Scheme: scheme}
 
-	_, _, err := r.handleProfiling(context.Background(), ras, &parsedSpec{})
-	if err == nil {
-		t.Fatal("expected error for failed job, got nil")
+	_, ready, err := r.handleProfiling(context.Background(), ras, &parsedSpec{})
+	if err != nil {
+		t.Fatalf("expected no error for deleting job, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "failed") {
-		t.Errorf("expected error to contain 'failed', got: %v", err)
+	if ready {
+		t.Error("expected not-ready for deleting job")
 	}
 
 	// Job should still exist, unchanged — no second delete issued.
@@ -944,5 +944,34 @@ func TestEnsurePlannerDeployment_SetsImagePullSecrets(t *testing.T) {
 	}
 	if created.Spec.Template.Spec.ImagePullSecrets[0].Name != "regcred" {
 		t.Errorf("expected 'regcred', got %q", created.Spec.Template.Spec.ImagePullSecrets[0].Name)
+	}
+}
+
+func TestShouldShortCircuitFailed(t *testing.T) {
+	tests := []struct {
+		name     string
+		phase    string
+		lastFail int64
+		gen      int64
+		want     bool
+	}{
+		{"not failed", "Initializing", 0, 1, false},
+		{"failed no spec change", "Failed", 2, 2, true},
+		{"failed gen behind", "Failed", 2, 1, true},
+		{"failed gen advanced", "Failed", 2, 3, false},
+		{"failed no lastFailGen recorded", "Failed", 0, 1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ras := &unstructured.Unstructured{}
+			ras.SetGeneration(tt.gen)
+			ras.Object["status"] = map[string]interface{}{
+				"phase":                           tt.phase,
+				"lastProfilingFailureGeneration": tt.lastFail,
+			}
+			if got := shouldShortCircuitFailed(ras); got != tt.want {
+				t.Errorf("shouldShortCircuitFailed() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
