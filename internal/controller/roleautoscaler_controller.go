@@ -242,6 +242,7 @@ type parsedSpec struct {
 	modelCachePVCName   string
 	modelCacheModelPath string
 	modelCacheMountPath string
+	imagePullSecrets    []corev1.LocalObjectReference
 }
 
 func (r *AutoScalerReconciler) parseRASSpec(ras *unstructured.Unstructured) (*parsedSpec, error) {
@@ -289,6 +290,17 @@ func (r *AutoScalerReconciler) parseRASSpec(ras *unstructured.Unstructured) (*pa
 	s.predictionWindow = getIntField(dp, "predictionWindow", 50)
 	s.noCorrection = getBoolField(dp, "noCorrection")
 	s.dryRun = getBoolField(dp, "dryRun")
+
+	// imagePullSecrets
+	if ips, ok := dp["imagePullSecrets"].([]interface{}); ok {
+		for _, item := range ips {
+			if m, ok := item.(map[string]interface{}); ok {
+				if name, ok := m["name"].(string); ok {
+					s.imagePullSecrets = append(s.imagePullSecrets, corev1.LocalObjectReference{Name: name})
+				}
+			}
+		}
+	}
 
 	// profiling
 	prof, _ := dp["profiling"].(map[string]interface{})
@@ -567,6 +579,7 @@ func (r *AutoScalerReconciler) createProfilingJob(ctx context.Context, ras *unst
 				Spec: corev1.PodSpec{
 					ServiceAccountName: saName,
 					RestartPolicy:      corev1.RestartPolicyNever,
+					ImagePullSecrets:   spec.imagePullSecrets,
 					Volumes:            volumes,
 					Containers: []corev1.Container{
 						{
@@ -620,6 +633,7 @@ func (r *AutoScalerReconciler) ensurePlannerDeployment(ctx context.Context, ras 
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: saName,
+					ImagePullSecrets:   spec.imagePullSecrets,
 					Containers: []corev1.Container{
 						{
 							Name:  "planner",

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -136,6 +137,14 @@ type DynamoPlannerConfig struct {
 	// +optional
 	// +kubebuilder:default=false
 	DryRun *bool `json:"dryRun,omitempty"`
+
+	// ImagePullSecrets is a list of references to Kubernetes secrets used for
+	// pulling the profiling and planner images from private registries.
+	// Applied to both the profiling Job and planner Deployment PodSpecs.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Profiling configures automatic SLA profiling.
 	// +optional
