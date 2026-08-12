@@ -42,6 +42,10 @@ spec:
       # Dry-run mode
       dryRun: false              # observe only, no actual scaling
 
+      # Private registry credentials (applied to both profiling Job and planner Deployment)
+      imagePullSecrets:
+        - name: regcred          # Kubernetes secret for pulling images from private registries
+
       profiling:
         image: "ghcr.io/rolebasedgroup/rbg-profiler:latest"
         # modelSource mounts a PVC with pre-downloaded model weights and
