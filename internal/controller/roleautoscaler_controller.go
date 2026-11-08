@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -723,6 +724,15 @@ func buildPlannerEnv(rbgName string, spec *parsedSpec, namespace string, maxGPUB
 	// planner derives it from BACKEND (e.g. "sglang-oai" -> "sglang").
 	if spec.metricSource != "" {
 		env = append(env, corev1.EnvVar{Name: "METRIC_SOURCE", Value: spec.metricSource})
+	}
+	// Forward operator-level Prometheus credentials to the planner so it
+	// can authenticate against secured query APIs (e.g. the SLS-backed
+	// ARMS Prometheus endpoint, which requires Basic auth).
+	if v := os.Getenv("PROMETHEUS_USERNAME"); v != "" {
+		env = append(env, corev1.EnvVar{Name: "PROMETHEUS_USERNAME", Value: v})
+	}
+	if v := os.Getenv("PROMETHEUS_PASSWORD"); v != "" {
+		env = append(env, corev1.EnvVar{Name: "PROMETHEUS_PASSWORD", Value: v})
 	}
 	return env
 }
