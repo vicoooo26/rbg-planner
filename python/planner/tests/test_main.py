@@ -24,11 +24,16 @@ class TestParseArgs:
 class TestBuildConfig:
     def test_both_overrides_applied(self):
         json_str = '{"metrics":{"ttft":"custom"}}'
-        with patch("sys.argv", [
-            "planner",
-            "--metric-source", "acme-llm",
-            "--metric-mapping-json", json_str,
-        ]):
+        with patch(
+            "sys.argv",
+            [
+                "planner",
+                "--metric-source",
+                "acme-llm",
+                "--metric-mapping-json",
+                json_str,
+            ],
+        ):
             args = parse_args()
         config = build_config(args)
         assert config.metric_source == "acme-llm"

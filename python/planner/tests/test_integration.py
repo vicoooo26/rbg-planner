@@ -46,7 +46,9 @@ class TestGoldenJSONIntegration:
         # 2. Parse JSON → factory → adapter
         metric_config = json.loads(config.metric_mapping_json)
         adapter = create_metrics_adapter(
-            "sglang", "http://prom:9090", metric_config,
+            "sglang",
+            "http://prom:9090",
+            metric_config,
         )
 
         # 3. modelLabel override: "model" instead of default "model_name"
@@ -79,7 +81,7 @@ class TestGoldenJSONIntegration:
         mock_prom.custom_query.return_value = [{"value": [0, "0.3"]}]
         adapter.get_avg_request_duration("180s", "Qwen")
         query = mock_prom.custom_query.call_args.kwargs["query"]
-        assert query == "increase(custom_duration_seconds{model=\"Qwen\"}[180s])"
+        assert query == 'increase(custom_duration_seconds{model="Qwen"}[180s])'
 
     def test_backward_compat_no_metric_config(self, mock_prom):
         """Empty metric_mapping_json → adapter uses built-in sglang defaults
@@ -93,7 +95,8 @@ class TestGoldenJSONIntegration:
 
         # No metric_config → built-in sglang defaults
         adapter = create_metrics_adapter(
-            config.metric_source, "http://prom:9090",
+            config.metric_source,
+            "http://prom:9090",
         )
 
         mock_prom.custom_query.return_value = [{"value": [0, "0.5"]}]

@@ -174,7 +174,9 @@ class TestRawTemplates:
     def test_raw_substitutes_label_filter_and_interval(self, mock_prom):
         mock_prom.custom_query.return_value = [{"value": [0, "0.5"]}]
         adapter = PrometheusAdapter(
-            "http://prom:9090", MetricNames(), {},
+            "http://prom:9090",
+            MetricNames(),
+            {},
             {"ttft": "avg(custom_ttft{labelFilter})"},
         )
         result = adapter.get_avg_ttft("180s", "Qwen")
@@ -185,7 +187,9 @@ class TestRawTemplates:
     def test_raw_empty_label_filter(self, mock_prom):
         mock_prom.custom_query.return_value = [{"value": [0, "0.5"]}]
         adapter = PrometheusAdapter(
-            "http://prom:9090", MetricNames(), {},
+            "http://prom:9090",
+            MetricNames(),
+            {},
             {"ttft": "increase(custom{labelFilter}[{interval}])"},
         )
         adapter.get_avg_ttft("180s")
@@ -196,7 +200,9 @@ class TestRawTemplates:
         # Even with a shape set, a raw template takes precedence.
         mock_prom.custom_query.return_value = [{"value": [0, "1.0"]}]
         adapter = PrometheusAdapter(
-            "http://prom:9090", MetricNames(), {"ttft": "histogram_avg"},
+            "http://prom:9090",
+            MetricNames(),
+            {"ttft": "histogram_avg"},
             {"ttft": "avg(custom{labelFilter})"},
         )
         adapter.get_avg_ttft("180s", "Qwen")

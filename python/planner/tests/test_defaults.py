@@ -47,5 +47,10 @@ class TestBuiltinEngines:
 
     def test_default_shapes_complete(self):
         assert set(DEFAULT_SHAPES.keys()) == {
-            "ttft", "itl", "request_duration", "requests_total", "isl", "osl",
+            "ttft",
+            "itl",
+            "request_duration",
+            "requests_total",
+            "isl",
+            "osl",
         }

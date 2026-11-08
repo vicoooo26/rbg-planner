@@ -115,10 +115,7 @@ def create_metrics_adapter(
         for k, v in metric_config.get("metricShapes", {}).items():
             if k in _SHAPE_KEY_MAP:
                 shapes[_SHAPE_KEY_MAP[k]] = v
-        raw_templates = {
-            _SHAPE_KEY_MAP.get(k, k): v
-            for k, v in metric_config.get("rawTemplates", {}).items()
-        }
+        raw_templates = {_SHAPE_KEY_MAP.get(k, k): v for k, v in metric_config.get("rawTemplates", {}).items()}
 
     if not is_builtin:
         _validate_complete(names)

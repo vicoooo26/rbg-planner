@@ -75,9 +75,12 @@ class TestCustomEngine:
     def test_custom_engine_complete(self, mock_prom):
         cfg = {
             "metrics": {
-                "ttft": "acme_ttft", "itl": "acme_itl",
-                "requestDuration": "acme_dur", "requestsTotal": "acme_reqs",
-                "promptTokens": "acme_prompt", "generationTokens": "acme_gen",
+                "ttft": "acme_ttft",
+                "itl": "acme_itl",
+                "requestDuration": "acme_dur",
+                "requestsTotal": "acme_reqs",
+                "promptTokens": "acme_prompt",
+                "generationTokens": "acme_gen",
             },
         }
         adapter = create_metrics_adapter("acme-llm", "http://prom:9090", cfg)
