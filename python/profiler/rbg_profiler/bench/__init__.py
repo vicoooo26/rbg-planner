@@ -26,11 +26,16 @@ BENCH_BACKENDS: dict[str, type[BenchBackend]] = {
 }
 
 
-def create_bench_backend(name: str) -> BenchBackend:
+def create_bench_backend(name: str, input_format: str = "auto", **kwargs) -> BenchBackend:
     """Create a bench backend for the given name.
 
     Args:
-        name: Backend identifier (e.g. "sglang-oai", "vllm-chat").
+        name: Backend identifier (e.g. "sglang-oai", "vllm-chat",
+            "sglang-pd-native").
+        input_format: Prompt input form for bench requests: "auto" (backend
+            default), "text" (decoded strings), or "token_ids" (ID arrays).
+        **kwargs: Extra backend-specific constructor options (e.g.
+            ``bootstrap_port`` for "sglang-pd-native").
 
     Raises:
         ValueError: If the name is not a registered backend.
@@ -41,4 +46,4 @@ def create_bench_backend(name: str) -> BenchBackend:
             f"Unknown bench backend: {name}. "
             f"Available: {list(BENCH_BACKENDS.keys())}"
         )
-    return backend_cls()
+    return backend_cls(input_format=input_format, **kwargs)
