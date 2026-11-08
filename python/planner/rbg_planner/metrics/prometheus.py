@@ -45,13 +45,22 @@ class PrometheusAdapter(MetricsAdapter):
 
     metrics: MetricNames
 
-    def __init__(self, url: str, username: Optional[str] = None, password: Optional[str] = None):
-        # Credentials from args (tests) or env (operator-injected planner env,
-        # e.g. Basic auth for the SLS-backed ARMS Prometheus query API).
+    def __init__(
+        self,
+        url: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        bearer_token: Optional[str] = None,
+    ):
+        # Credentials from args (tests) or env (operator-injected planner
+        # env, e.g. Basic auth for the SLS-backed ARMS Prometheus query
+        # API). Bearer token wins over Basic auth.
+        bearer_token = bearer_token if bearer_token is not None else os.environ.get("PROMETHEUS_TOKEN")
+        headers = {"Authorization": f"Bearer {bearer_token}"} if bearer_token else None
         username = username if username is not None else os.environ.get("PROMETHEUS_USERNAME")
         password = password if password is not None else os.environ.get("PROMETHEUS_PASSWORD")
         auth = (username, password) if username and password else None
-        self.prom = PrometheusConnect(url=url, auth=auth, disable_ssl=True)
+        self.prom = PrometheusConnect(url=url, auth=auth, headers=headers, disable_ssl=True)
 
     # ── shared query helpers ─────────────────────────────────────────
 

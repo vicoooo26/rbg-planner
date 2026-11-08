@@ -66,12 +66,18 @@ spec:
         port: 9091
         # Optional: override the operator-level Prometheus query endpoint.
         # endpoint: https://sls-prometheus.example.com/prometheus/workspace
-        # Optional: HTTP Basic auth for the query endpoint, following the
-        # prometheus-operator SecretKeySelector convention.
-        # basicAuth:
-        #   username:
-        #     name: prometheus-auth
-        #     key: username
-        #   password:
-        #     name: prometheus-auth
-        #     key: password
+        # Optional: credentials for the query endpoint, one mechanism only.
+        # authentication:
+        #   # HTTP Basic auth (prometheus-operator SecretKeySelector convention)
+        #   basicAuth:
+        #     username:
+        #       name: prometheus-auth
+        #       key: username
+        #     password:
+        #       name: prometheus-auth
+        #       key: password
+        #   # or bearer token
+        #   bearer:
+        #     token:
+        #       name: prometheus-auth
+        #       key: token

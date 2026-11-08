@@ -857,9 +857,11 @@ func TestParseRASSpec_MetricsBasicAuth(t *testing.T) {
 					"dynamoPlanner": map[string]interface{}{
 						"metrics": map[string]interface{}{
 							"endpoint": "https://sls.example.com/prometheus/ws",
-							"basicAuth": map[string]interface{}{
-								"username": map[string]interface{}{"name": "prom-auth", "key": "user"},
-								"password": map[string]interface{}{"name": "prom-auth", "key": "pass"},
+							"authentication": map[string]interface{}{
+								"basicAuth": map[string]interface{}{
+									"username": map[string]interface{}{"name": "prom-auth", "key": "user"},
+									"password": map[string]interface{}{"name": "prom-auth", "key": "pass"},
+								},
 							},
 						},
 					},
@@ -876,14 +878,14 @@ func TestParseRASSpec_MetricsBasicAuth(t *testing.T) {
 	if spec.prometheusEndpoint != "https://sls.example.com/prometheus/ws" {
 		t.Errorf("expected endpoint override, got %q", spec.prometheusEndpoint)
 	}
-	if spec.prometheusBasicAuth == nil {
-		t.Fatal("expected prometheusBasicAuth to be set")
+	if spec.prometheusUsernameSecret == nil || spec.prometheusUsernameSecret.Name != "prom-auth" || spec.prometheusUsernameSecret.Key != "user" {
+		t.Errorf("username selector mismatch: %+v", spec.prometheusUsernameSecret)
 	}
-	if spec.prometheusBasicAuth.username.Name != "prom-auth" || spec.prometheusBasicAuth.username.Key != "user" {
-		t.Errorf("username selector mismatch: %+v", spec.prometheusBasicAuth.username)
+	if spec.prometheusPasswordSecret == nil || spec.prometheusPasswordSecret.Name != "prom-auth" || spec.prometheusPasswordSecret.Key != "pass" {
+		t.Errorf("password selector mismatch: %+v", spec.prometheusPasswordSecret)
 	}
-	if spec.prometheusBasicAuth.password.Name != "prom-auth" || spec.prometheusBasicAuth.password.Key != "pass" {
-		t.Errorf("password selector mismatch: %+v", spec.prometheusBasicAuth.password)
+	if spec.prometheusTokenSecret != nil {
+		t.Errorf("expected no token secret, got %+v", spec.prometheusTokenSecret)
 	}
 
 	env := buildPlannerEnv("rbg", spec, "default", 8, 1, 1)
@@ -904,31 +906,102 @@ func TestParseRASSpec_MetricsBasicAuth(t *testing.T) {
 	}
 }
 
-func TestParseRASSpec_MetricsBasicAuthRejectsIncomplete(t *testing.T) {
-	for name, ba := range map[string]map[string]interface{}{
-		"missing key": {
-			"username": map[string]interface{}{"name": "s"},
-			"password": map[string]interface{}{"name": "s", "key": "p"},
-		},
-		"missing name": {
-			"username": map[string]interface{}{"key": "u"},
-			"password": map[string]interface{}{"name": "s", "key": "p"},
-		},
-	} {
-		ras := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"implementation": map[string]interface{}{
-						"dynamoPlanner": map[string]interface{}{
-							"metrics": map[string]interface{}{"basicAuth": ba},
-						},
+func metricsAuthRAS(me map[string]interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"pattern": map[string]interface{}{
+					"pdDisaggregated": map[string]interface{}{},
+				},
+				"implementation": map[string]interface{}{
+					"dynamoPlanner": map[string]interface{}{
+						"metrics": me,
 					},
 				},
 			},
-		}
+		},
+	}
+}
+
+func TestParseRASSpec_MetricsAuthRejectsInvalid(t *testing.T) {
+	cases := map[string]map[string]interface{}{
+		"basicAuth and bearer together": {
+			"authentication": map[string]interface{}{
+				"basicAuth": map[string]interface{}{
+					"username": map[string]interface{}{"name": "s", "key": "u"},
+					"password": map[string]interface{}{"name": "s", "key": "p"},
+				},
+				"bearer": map[string]interface{}{
+					"token": map[string]interface{}{"name": "s", "key": "t"},
+				},
+			},
+		},
+		"basicAuth username missing key": {
+			"authentication": map[string]interface{}{
+				"basicAuth": map[string]interface{}{
+					"username": map[string]interface{}{"name": "s"},
+					"password": map[string]interface{}{"name": "s", "key": "p"},
+				},
+			},
+		},
+		"basicAuth password missing": {
+			"authentication": map[string]interface{}{
+				"basicAuth": map[string]interface{}{
+					"username": map[string]interface{}{"name": "s", "key": "u"},
+				},
+			},
+		},
+		"bearer token missing key": {
+			"authentication": map[string]interface{}{
+				"bearer": map[string]interface{}{
+					"token": map[string]interface{}{"name": "s"},
+				},
+			},
+		},
+	}
+	for name, me := range cases {
 		r := &AutoScalerReconciler{}
-		if _, err := r.parseRASSpec(ras); err == nil {
+		if _, err := r.parseRASSpec(metricsAuthRAS(me)); err == nil {
 			t.Errorf("%s: expected error, got nil", name)
 		}
+	}
+}
+
+func TestParseRASSpec_MetricsBearerToken(t *testing.T) {
+	me := map[string]interface{}{
+		"authentication": map[string]interface{}{
+			"bearer": map[string]interface{}{
+				"token": map[string]interface{}{"name": "prom-auth", "key": "token"},
+			},
+		},
+	}
+	r := &AutoScalerReconciler{PrometheusEndpoint: "http://default:9090"}
+	spec, err := r.parseRASSpec(metricsAuthRAS(me))
+	if err != nil {
+		t.Fatalf("parseRASSpec failed: %v", err)
+	}
+	if spec.prometheusTokenSecret == nil || spec.prometheusTokenSecret.Name != "prom-auth" || spec.prometheusTokenSecret.Key != "token" {
+		t.Fatalf("token selector mismatch: %+v", spec.prometheusTokenSecret)
+	}
+	if spec.prometheusUsernameSecret != nil || spec.prometheusPasswordSecret != nil {
+		t.Fatalf("expected no basic auth selectors, got %+v/%+v", spec.prometheusUsernameSecret, spec.prometheusPasswordSecret)
+	}
+
+	env := buildPlannerEnv("rbg", spec, "default", 8, 1, 1)
+	var token *corev1.EnvVarSource
+	hasBasic := false
+	for _, e := range env {
+		switch e.Name {
+		case "PROMETHEUS_TOKEN":
+			token = e.ValueFrom
+		case "PROMETHEUS_USERNAME", "PROMETHEUS_PASSWORD":
+			hasBasic = true
+		}
+	}
+	if token == nil || token.SecretKeyRef == nil || token.SecretKeyRef.Name != "prom-auth" || token.SecretKeyRef.Key != "token" {
+		t.Errorf("expected PROMETHEUS_TOKEN secretKeyRef prom-auth/token, got %+v", token)
+	}
+	if hasBasic {
+		t.Error("bearer auth must not inject PROMETHEUS_USERNAME/PASSWORD")
 	}
 }

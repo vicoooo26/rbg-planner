@@ -140,3 +140,24 @@ class TestAuthAndMetricNames:
         assert adapter.metrics.requests_total == "sglang:num_requests_total"
         assert adapter.metrics.prompt_tokens == "sglang:prompt_tokens_total"
         assert adapter.metrics.generation_tokens == "sglang:generation_tokens_total"
+
+    def test_bearer_token_from_env(self, mock_prom, monkeypatch):
+        monkeypatch.setenv("PROMETHEUS_TOKEN", "tok123")
+        monkeypatch.delenv("PROMETHEUS_USERNAME", raising=False)
+        monkeypatch.delenv("PROMETHEUS_PASSWORD", raising=False)
+        with patch("rbg_planner.metrics.prometheus.PrometheusConnect") as mock_cls:
+            from rbg_planner.metrics.prometheus import PrometheusAdapter
+
+            PrometheusAdapter("http://prom:9090")
+            assert mock_cls.call_args.kwargs["headers"] == {"Authorization": "Bearer tok123"}
+            assert mock_cls.call_args.kwargs["auth"] is None
+
+    def test_bearer_token_wins_over_basic(self, mock_prom, monkeypatch):
+        monkeypatch.setenv("PROMETHEUS_TOKEN", "tok123")
+        monkeypatch.setenv("PROMETHEUS_USERNAME", "user")
+        monkeypatch.setenv("PROMETHEUS_PASSWORD", "pass")
+        with patch("rbg_planner.metrics.prometheus.PrometheusConnect") as mock_cls:
+            from rbg_planner.metrics.prometheus import PrometheusAdapter
+
+            PrometheusAdapter("http://prom:9090")
+            assert mock_cls.call_args.kwargs["headers"] == {"Authorization": "Bearer tok123"}
