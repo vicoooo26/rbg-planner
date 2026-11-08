@@ -241,10 +241,13 @@ type parsedSpec struct {
 	metricSource         string
 	metricsPort          int
 	prometheusEndpoint   string
-	modelCachePVCName    string
-	modelCacheModelPath  string
-	modelCacheMountPath  string
-	imagePullSecrets     []corev1.LocalObjectReference
+	// per-CR overrides from spec.implementation.dynamoPlanner.metrics
+	prometheusEndpointOverride string
+	prometheusBasicAuth        *prometheusBasicAuth
+	modelCachePVCName          string
+	modelCacheModelPath        string
+	modelCacheMountPath        string
+	imagePullSecrets           []corev1.LocalObjectReference
 }
 
 func (r *AutoScalerReconciler) parseRASSpec(ras *unstructured.Unstructured) (*parsedSpec, error) {
@@ -324,11 +327,26 @@ func (r *AutoScalerReconciler) parseRASSpec(ras *unstructured.Unstructured) (*pa
 	me, _ := dp["metrics"].(map[string]interface{})
 	s.metricSource = getStrField(me, "metricSource", "")
 	s.metricsPort = getIntField(me, "port", 9091)
+	s.prometheusEndpointOverride = getStrField(me, "endpoint", "")
+	if ba, ok := me["basicAuth"].(map[string]interface{}); ok {
+		username, err := parseSecretKeySelector(ba, "username")
+		if err != nil {
+			return nil, fmt.Errorf("metrics.basicAuth.username: %w", err)
+		}
+		password, err := parseSecretKeySelector(ba, "password")
+		if err != nil {
+			return nil, fmt.Errorf("metrics.basicAuth.password: %w", err)
+		}
+		s.prometheusBasicAuth = &prometheusBasicAuth{username: username, password: password}
+	}
 
 	// prometheusEndpoint
 	s.prometheusEndpoint = r.PrometheusEndpoint
 	if s.prometheusEndpoint == "" {
 		s.prometheusEndpoint = defaultPrometheusEndpoint
+	}
+	if s.prometheusEndpointOverride != "" {
+		s.prometheusEndpoint = s.prometheusEndpointOverride
 	}
 
 	return s, nil
@@ -725,14 +743,32 @@ func buildPlannerEnv(rbgName string, spec *parsedSpec, namespace string, maxGPUB
 	if spec.metricSource != "" {
 		env = append(env, corev1.EnvVar{Name: "METRIC_SOURCE", Value: spec.metricSource})
 	}
-	// Forward operator-level Prometheus credentials to the planner so it
-	// can authenticate against secured query APIs (e.g. the SLS-backed
-	// ARMS Prometheus endpoint, which requires Basic auth).
-	if v := os.Getenv("PROMETHEUS_USERNAME"); v != "" {
-		env = append(env, corev1.EnvVar{Name: "PROMETHEUS_USERNAME", Value: v})
-	}
-	if v := os.Getenv("PROMETHEUS_PASSWORD"); v != "" {
-		env = append(env, corev1.EnvVar{Name: "PROMETHEUS_PASSWORD", Value: v})
+	// Prometheus credentials: prefer the per-CR metrics.basicAuth
+	// (Secret references, never inlined into the pod spec); fall back to
+	// forwarding operator-level env so a single-credential install needs
+	// no CR configuration.
+	if spec.prometheusBasicAuth != nil {
+		env = append(env,
+			corev1.EnvVar{
+				Name: "PROMETHEUS_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &spec.prometheusBasicAuth.username,
+				},
+			},
+			corev1.EnvVar{
+				Name: "PROMETHEUS_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &spec.prometheusBasicAuth.password,
+				},
+			},
+		)
+	} else {
+		if v := os.Getenv("PROMETHEUS_USERNAME"); v != "" {
+			env = append(env, corev1.EnvVar{Name: "PROMETHEUS_USERNAME", Value: v})
+		}
+		if v := os.Getenv("PROMETHEUS_PASSWORD"); v != "" {
+			env = append(env, corev1.EnvVar{Name: "PROMETHEUS_PASSWORD", Value: v})
+		}
 	}
 	return env
 }
@@ -989,6 +1025,31 @@ func getStrField(m map[string]interface{}, key, defaultVal string) string {
 		return defaultVal
 	}
 	return v
+}
+
+// prometheusBasicAuth mirrors the CRD metrics.basicAuth SecretKeySelectors.
+type prometheusBasicAuth struct {
+	username corev1.SecretKeySelector
+	password corev1.SecretKeySelector
+}
+
+// parseSecretKeySelector reads a {name, key} SecretKeySelector from an
+// unstructured map, requiring both fields like the prometheus-operator
+// basicAuth convention.
+func parseSecretKeySelector(m map[string]interface{}, field string) (corev1.SecretKeySelector, error) {
+	selector := corev1.SecretKeySelector{}
+	sub, ok := m[field].(map[string]interface{})
+	if !ok {
+		return selector, fmt.Errorf("%s must be a {name, key} SecretKeySelector", field)
+	}
+	name := getStrField(sub, "name", "")
+	key := getStrField(sub, "key", "")
+	if name == "" || key == "" {
+		return selector, fmt.Errorf("%s requires both name and key", field)
+	}
+	selector.LocalObjectReference = corev1.LocalObjectReference{Name: name}
+	selector.Key = key
+	return selector, nil
 }
 
 func getIntField(m map[string]interface{}, key string, defaultVal int) int {

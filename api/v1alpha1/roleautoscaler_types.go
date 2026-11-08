@@ -229,6 +229,26 @@ type MetricsConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	Port *int32 `json:"port,omitempty"`
+
+	// Endpoint overrides the operator-level Prometheus query endpoint
+	// for this AutoScaler's planner.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// BasicAuth configures HTTP Basic authentication for the Prometheus
+	// query endpoint, following the prometheus-operator SecretKeySelector
+	// convention (as in ServiceMonitor/RemoteRead basicAuth).
+	// +optional
+	BasicAuth *BasicAuthConfig `json:"basicAuth,omitempty"`
+}
+
+// BasicAuthConfig holds HTTP Basic auth credentials sourced from Secrets.
+type BasicAuthConfig struct {
+	// Username is the Secret key selector holding the username.
+	Username corev1.SecretKeySelector `json:"username"`
+
+	// Password is the Secret key selector holding the password.
+	Password corev1.SecretKeySelector `json:"password"`
 }
 
 // AutoScalerPhase represents the current phase of an AutoScaler.

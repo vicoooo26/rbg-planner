@@ -64,3 +64,14 @@ spec:
       metrics:
         metricSource: sglang
         port: 9091
+        # Optional: override the operator-level Prometheus query endpoint.
+        # endpoint: https://sls-prometheus.example.com/prometheus/workspace
+        # Optional: HTTP Basic auth for the query endpoint, following the
+        # prometheus-operator SecretKeySelector convention.
+        # basicAuth:
+        #   username:
+        #     name: prometheus-auth
+        #     key: username
+        #   password:
+        #     name: prometheus-auth
+        #     key: password

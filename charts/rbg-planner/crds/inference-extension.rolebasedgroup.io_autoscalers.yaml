@@ -116,6 +116,71 @@ spec:
                       metrics:
                         description: Metrics configures metrics collection and exposition.
                         properties:
+                          basicAuth:
+                            description: |-
+                              BasicAuth configures HTTP Basic authentication for the Prometheus
+                              query endpoint, following the prometheus-operator SecretKeySelector
+                              convention (as in ServiceMonitor/RemoteRead basicAuth).
+                            properties:
+                              password:
+                                description: Password is the Secret key selector holding
+                                  the password.
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from.  Must
+                                      be a valid secret key.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its
+                                      key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              username:
+                                description: Username is the Secret key selector holding
+                                  the username.
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from.  Must
+                                      be a valid secret key.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its
+                                      key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - password
+                            - username
+                            type: object
+                          endpoint:
+                            description: |-
+                              Endpoint overrides the operator-level Prometheus query endpoint
+                              for this AutoScaler's planner.
+                            type: string
                           metricSource:
                             default: sglang
                             description: MetricSource selects the metric source type.
