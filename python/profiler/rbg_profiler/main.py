@@ -82,6 +82,15 @@ def main():
     )
 
     parser.add_argument(
+        "--bench-method",
+        default=os.environ.get("BENCH_METHOD", "http"),
+        choices=["http", "inference-perf"],
+        help="Bench execution method (default: http). "
+             "'http' uses built-in HTTP benchmarking. "
+             "'inference-perf' uses the inference-perf CLI tool.",
+    )
+
+    parser.add_argument(
         "--prefill-role-name",
         default=os.environ.get("PREFILL_ROLE_NAME", "prefill"),
         help="Prefill role name in RBG",
