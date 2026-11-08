@@ -75,7 +75,14 @@ async def run_profiling(
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    bench_backend = create_bench_backend(backend, input_format=input_format)
+    backend_kwargs = {}
+    if backend == "sglang-pd-native":
+        backend_kwargs["bootstrap_port"] = int(
+            getattr(args, "pd_bootstrap_port", 8998)
+        )
+    bench_backend = create_bench_backend(
+        backend, input_format=input_format, **backend_kwargs
+    )
 
     prefill_isl_points = [int(x) for x in args.prefill_isl_points.split(",")]
     decode_isl_points = [int(x) for x in args.decode_isl_points.split(",")]

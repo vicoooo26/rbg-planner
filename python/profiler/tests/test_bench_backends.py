@@ -17,6 +17,7 @@ from rbg_profiler.bench.vllm import VLLMBenchBackend, VLLMChatBenchBackend
 def test_registry_contains_all_backends():
     assert "sglang-oai" in BENCH_BACKENDS
     assert "sglang-oai-chat" in BENCH_BACKENDS
+    assert "sglang-pd-native" in BENCH_BACKENDS
     assert "vllm" in BENCH_BACKENDS
     assert "vllm-chat" in BENCH_BACKENDS
 

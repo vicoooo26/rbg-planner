@@ -16,11 +16,13 @@ Usage::
 
 from rbg_profiler.bench.base import BaseBenchBackend, BenchBackend
 from rbg_profiler.bench.sglang import SGLangBenchBackend, SGLangChatBenchBackend
+from rbg_profiler.bench.sglang_pd import SGLangPDNativeBenchBackend
 from rbg_profiler.bench.vllm import VLLMBenchBackend, VLLMChatBenchBackend
 
 BENCH_BACKENDS: dict[str, type[BenchBackend]] = {
     "sglang-oai": SGLangBenchBackend,
     "sglang-oai-chat": SGLangChatBenchBackend,
+    "sglang-pd-native": SGLangPDNativeBenchBackend,
     "vllm": VLLMBenchBackend,
     "vllm-chat": VLLMChatBenchBackend,
 }

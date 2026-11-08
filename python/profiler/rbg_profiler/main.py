@@ -71,6 +71,16 @@ def main():
         help="Prompt input form for bench requests (default: auto)",
     )
 
+    # Prefill engine's --disaggregation-bootstrap-port, used by the
+    # sglang-pd-native backend when attaching bootstrap fields to PD requests.
+    parser.add_argument(
+        "--pd-bootstrap-port",
+        type=int,
+        default=int(os.environ.get("PD_BOOTSTRAP_PORT", "8998")),
+        help="Prefill engine disaggregation bootstrap port "
+             "(sglang-pd-native backend only)",
+    )
+
     parser.add_argument(
         "--prefill-role-name",
         default=os.environ.get("PREFILL_ROLE_NAME", "prefill"),
